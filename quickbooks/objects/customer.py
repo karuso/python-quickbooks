@@ -84,3 +84,12 @@ class Customer(QuickbooksManagedObject, QuickbooksTransactionEntity):
         ref.value = self.Id
 
         return ref
+
+    @classmethod
+    def get_by_vat(cls, vat, qb):
+        customers = cls.filter(Active=True, AlternatePhone=vat, qb=qb)
+        print(customers)
+
+        if customers is not None:
+            return customers[0]
+
