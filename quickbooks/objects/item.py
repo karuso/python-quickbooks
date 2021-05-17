@@ -26,6 +26,7 @@ class Item(QuickbooksManagedObject, QuickbooksTransactionEntity):
         "IncomeAccountRef": Ref,
         "ParentRef": Ref,
         "SalesTaxCodeRef": Ref,
+        "ClassRef": Ref,
         "PurchaseTaxCodeRef": Ref,
     }
 
@@ -61,10 +62,12 @@ class Item(QuickbooksManagedObject, QuickbooksTransactionEntity):
         self.AbatementRate = None
         self.ReverseChargeRate = None
         self.ServiceType = None
-        self.ItemCategoryType = None
+
 
         # These fields are for minor version 4
         self.Sku = None
+        self.ClassRef = None
+        self.Category = None
 
     def __str__(self):
         return self.Name
