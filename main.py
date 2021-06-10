@@ -7,6 +7,7 @@ from quickbooks.objects.department import Department
 from quickbooks.objects.item import Item
 from quickbooks.objects.term import Term
 from quickbooks.objects.classitem import ClassItem
+from quickbooks.objects.creditmemo import CreditMemo
 
 from openpyxl import Workbook, load_workbook
 
@@ -16,8 +17,7 @@ class PythonQuickBooks(object):
     """
     PythonQuickBooks
 
-    Main class that acts as in interfqace to the
-    quickbooks library
+    Main class that acts as in interface for the quickbooks library
     """
 
     def __init__(self):
@@ -67,67 +67,7 @@ class PythonQuickBooks(object):
         except:
             return None
 
-    # def list_customers(self):
-
-    #     for c in self.customers:
-    #         if c.SalesTermRef is not None:
-    #             t = Term.get(id=c.SalesTermRef.value, qb=self.client)
-    #             print(t)
-
-    #     def single_item(self):
-    #         item = Item.where("Name LIKE 'TEST%'", qb=self.client)[0]
-
-    #         print(f"""
-    # {item.Name}
-    # BU:{item.ClassRef}
-    # CAT:{item.Category}
-    # SKU:{item.Sku}""")
-
-    #         item.Name = "TEST Prodotto Modificato 2"
-    #         item.ClassRef.Id = "400000000000583914"
-    #         item.Category = 15
-    #         #item.Sku = "Contratti Manutenzione"
-    #         item.save(qb=self.client)
-
-    # def get_categories(self):
-    #     categories = Item.where("Type='Category'", qb=self.client)
-
-    #     for cat in categories:
-    #         print(f"""[{cat.Id}] {cat.Name} ({cat.ParentRef})""")
-
-    # def get_items(self):
-    #     categories = Item.where("Type='Category'", qb=self.client)
-
-    #     for cat in categories:
-    #         print(f"""[{cat.Id} {cat.Name}""")
-
-    # def get_customer_details(self):
-    #     customer = Customer.where("AlternatePhone.FreeFormNumber='IT01101890109'", qb=self.client)
-
-        # print(f"{customer.SalesTermRef.Value}")
-        # print(f"{customer}")
-
-    # def get_classes(self):
-    #     classes = ClassItem.all(qb=self.client)
-    #     for c in classes:
-    #         print(c)
-
-    # def fix_customers(self):
-    #     customers = Customer.filter(Active=True, max_results=1000, qb=self.client)
-    #     # customers = Customer.where("Active = True", max_results=1000, qb=self.client)
-    #     num = 0
-    #     for c in customers:
-    #         if c.DisplayName.startswith("Marino"):
-    #             c.DisplayName = c.CompanyName
-    #             c.FullyQualifiedName = c.CompanyName
-    #             c.Suffix = "MARINO"
-    #             c.save(qb=self.client)
-    #             num += 1
-
-        # print(f"TOTALE: {num}")
-
-
-    def set_location_in_invoices(self):
+    def _set_location_in_invoices(self):
         """
         Change Location value in invoice to Sales
         contained in client's suffix field
@@ -152,6 +92,32 @@ class PythonQuickBooks(object):
                 else:
                     print(f"[ERROR] c.Suffix IS NONE FOR {c}")
         print(f"set_location_in_invoices ended")
+
+    def _set_location_in_creditnotes(self):
+        """
+        Change Location value in creditnotes to Sales
+        contained in client's suffix field
+
+        TODO: make it scriptable to run into a cron job
+        """
+        creditnotes = CreditMemo.filter(max_results=1000,
+                                        order_by="DocNumber DESC",
+                                        qb=self.client)
+
+        for cn in creditnotes:
+            if cn.DepartmentRef is None:
+                c = Customer.get(cn.CustomerRef.value, qb=self.client)
+                if c.Suffix != "":
+                    location = self._get_location(sales_name=c.Suffix)
+                    if location is not None:
+                        # print(f"CREDIT NOTE {cn.DocNumber} ASSIGNED TO {c.Suffix} LOCATION ID {location.Id}")
+                        cn.DepartmentRef = location.to_ref()
+                        cn.save(qb=self.client)
+                    else:
+                        print(f"[ERROR] Location IS NONE FOR {c.Suffix} OF {c}")
+                else:
+                    print(f"[ERROR] c.Suffix IS NONE FOR {c}")
+        print(f"set_location_in_creditnotes ended")
 
     def _load_excel_file(self, path):
         """Load Excel file"""
@@ -333,13 +299,18 @@ class PythonQuickBooks(object):
         ws.cell(column=9, row=row, value='Amount')
         ws.cell(column=10, row=row, value='Item Tax Code')
 
+    def list_credit_notes(self):
+        creditnotes = CreditMemo.all(order_by="DocNumber DESC", qb=self.client)
+        for cn in creditnotes:
+            print(f"Nota di Credito n {cn.DepartmentRef}")
+
+    def set_location_in_accounting(self):
+        self._set_location_in_invoices()
+        self._set_locations_in_creditnotes()
+
     def run(self):
-        # self.get_customer_details()
         # self.import_invoices(input='data/invoices_origin.xlsx', output='data/output.xlsx')
-        # print(f"TROVATI: {self.trovati} SU: {self.quanti}")
-        self.set_location_in_invoices()
-
-
+        self.set_location_in_accounting()
 
 
 def main():
