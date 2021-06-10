@@ -151,6 +151,7 @@ class PythonQuickBooks(object):
                         print(f"[ERROR] Location IS NONE FOR {c.Suffix} OF {c}")
                 else:
                     print(f"[ERROR] c.Suffix IS NONE FOR {c}")
+        print(f"set_location_in_invoices ended")
 
     def _load_excel_file(self, path):
         """Load Excel file"""
