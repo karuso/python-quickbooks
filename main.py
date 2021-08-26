@@ -74,6 +74,7 @@ class PythonQuickBooks(object):
 
         TODO: make it scriptable to run into a cron job
         """
+        print(f"set_location_in_invoices started...")
         invoices = Invoice.filter(max_results=1000,
                                   order_by="DocNumber DESC",
                                   qb=self.client)
@@ -86,12 +87,16 @@ class PythonQuickBooks(object):
                     if location is not None:
                         # print(f"INVOICE {i.DocNumber} ASSIGNED TO {c.Suffix} LOCATION ID {location.Id}")
                         i.DepartmentRef = location.to_ref()
-                        i.save(qb=self.client)
+                        try:
+                            i.save(qb=self.client)
+                        except Exception as e:
+                            print(f"[ERROR][I:{i.DocNumber}][C:{c}][A:{i.TotalAmt}] - {e}")
+                            # print(f"FATTURA:{i.DocNumber} Località: {i.DepartmentRef}")
                     else:
-                        print(f"[ERROR] Location IS NONE FOR {c.Suffix} OF {c}")
+                        print(f"[ERROR] Location IS NONE FOR {c.Suffix} OF {c} - {c.Active}")
                 else:
                     print(f"[ERROR] c.Suffix IS NONE FOR {c}")
-        print(f"set_location_in_invoices ended")
+        print(f"set_location_in_invoices ended.")
 
     def _set_location_in_creditnotes(self):
         """
@@ -100,6 +105,7 @@ class PythonQuickBooks(object):
 
         TODO: make it scriptable to run into a cron job
         """
+        print(f"set_location_in_creditnotes started...")
         creditnotes = CreditMemo.filter(max_results=1000,
                                         order_by="DocNumber DESC",
                                         qb=self.client)
@@ -117,7 +123,7 @@ class PythonQuickBooks(object):
                         print(f"[ERROR] Location IS NONE FOR {c.Suffix} OF {c}")
                 else:
                     print(f"[ERROR] c.Suffix IS NONE FOR {c}")
-        print(f"set_location_in_creditnotes ended")
+        print(f"set_location_in_creditnotes ended.")
 
     def _load_excel_file(self, path):
         """Load Excel file"""
@@ -153,7 +159,7 @@ class PythonQuickBooks(object):
 
     def _get_customer_terms(self, customer):
         """Get Customer terms of payment"""
-        if customer.SalesTermRef.value is not None:
+        if customer.SalesTermRef is not None and customer.SalesTermRef.value is not None:
             return Term.get(customer.SalesTermRef.value, qb=self.client)
         return None
 
@@ -165,19 +171,22 @@ class PythonQuickBooks(object):
 
     def _get_due_date(self, terms, ref):
         # print(f"{term.Name}\t{term.DayOfMonthDue}\t{term.DueNextMonthDays}\t{term.DueDays}")
+        if terms is None:
+            print(f">>>>> TERMINI NULLI REF: {ref}")
+            return "XXX-XX-XXXX"
         if terms.DueNextMonthDays is not None:
             months = terms.DueNextMonthDays / 30
             return f"=EOMONTH({ref}, {months})"
         return f"={ref}+{terms.DueDays}"
 
-    def update_invoices_terms_and_due_date(self):
-        """Read and update an Excel file to be used to import into QB"""
-        path = '/Users/ale/Documents/git/python-quickbooks/data/invoices.xlsx'
-        ws = self._load_excel_file(path)
+    # def update_invoices_terms_and_due_date(self):
+    #     """Read and update an Excel file to be used to import into QB"""
+    #     path = '/Users/ale/Documents/git/python-quickbooks/data/invoices.xlsx'
+    #     ws = self._load_excel_file(path)
 
-        for row in ws.iter_rows(min_row=2, min_col=2, max_col=2, values_only=True):
-            if row[0] is not None:
-                t = self._get_customer_terms(vat_number=row[0])
+    #     for row in ws.iter_rows(min_row=2, min_col=2, max_col=2, values_only=True):
+    #         if row[0] is not None:
+    #             t = self._get_customer_terms(vat_number=row[0])
 
 
     # def list_terms(self):
@@ -223,13 +232,12 @@ class PythonQuickBooks(object):
                 customer = self._get_customer_from_vat(vat_number=vat_id)
 
                 if customer is None:
-                    print(f">>>>> CLIENTE NON TROVATO VAT ID: {vat_id}")
+                    print(f"[E - {row[0]}] CLIENTE NON TROVATO VAT ID: {vat_id}")
                 else:
                     # 2.2
                     terms = self._get_customer_terms(customer)
                     if terms is None:
-                        print(f">>>>> TERMINI DI PAGAMENTO NON TROVATI CLIENTE {customer}")
-
+                        print(f"[E - {customer}] TERMINI DI PAGAMENTO NON TROVATI")
                     self._output(ws=ws_out, data=row, terms=terms, row_no=row_no)
                     if row[3] == 'S':
                         # add row for expenses
@@ -306,7 +314,7 @@ class PythonQuickBooks(object):
 
     def set_location_in_accounting(self):
         self._set_location_in_invoices()
-        self._set_locations_in_creditnotes()
+        self._set_location_in_creditnotes()
 
     def run(self):
         # self.import_invoices(input='data/invoices_origin.xlsx', output='data/output.xlsx')
@@ -316,7 +324,9 @@ class PythonQuickBooks(object):
 def main():
 
     pyqb = PythonQuickBooks()
+    print(f"PYTHON QUICKBOOKS STARTED...")
     pyqb.run()
+    print(f"PYTHON QUICKBOOKS ENDED.")
 
 
 if __name__ == '__main__':
