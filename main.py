@@ -32,13 +32,25 @@ class PythonQuickBooks(object):
 
         super(PythonQuickBooks, self).__init__()
         self.client = self._create_client()
-        self.customers = Customer.where(
+        self.customers = self._load_customers()
+        self.trovati = 0
+
+    def _load_customers(self):
+        customers = Customer.where(
             "Active=True",
             order_by='DisplayName',
             max_results=1000,
+            start_position=1,
             qb=self.client)
-        self.trovati = 0
-        self.quanti = len(self.customers)
+
+        customers += Customer.where(
+            "Active=True",
+            order_by='DisplayName',
+            max_results=1000,
+            start_position=1000,
+            qb=self.client)
+
+        return customers
 
     def _create_client(self):
         auth_client = AuthClient(
@@ -152,7 +164,7 @@ class PythonQuickBooks(object):
         customer = None
         for c in self.customers:
             if c.AlternatePhone is not None:
-                if c.AlternatePhone.FreeFormNumber == f"{vat_number}":
+                if vat_number in c.AlternatePhone.FreeFormNumber:
                     # print(f"TROVATO QUALCOSA per {vat_number}")
                     customer = c
         return customer
@@ -254,33 +266,37 @@ class PythonQuickBooks(object):
         wb_out.save(output)
 
     def _output(self, ws, data, terms, row_no, expenses=False):
-        # Customer
+        # # Customer
         ws.cell(column=1, row=row_no, value=data[0])
-        # Partita Iva
-        vat = f"IT{data[1]}"
-        if data[1] == '':
-            vat = f"CF{data[2]}"
-        ws.cell(column=2, row=row_no, value=vat)
-        # Invoice no
-        ws.cell(column=3, row=row_no, value='')
-        # Invoice date
-        ws.cell(column=4, row=row_no, value='')
-        # Due date
-        ref = ws.cell(column=4, row=row_no).coordinate
-        ws.cell(column=5, row=row_no, value=self._get_due_date(terms, ref))
-        # Terms
-        ws.cell(column=6, row=row_no, value=f"{terms}")
-        # Item product/service
-        ws.cell(column=7, row=row_no, value=data[6])
-        # Item description
-        ws.cell(column=8, row=row_no, value=self._format_description(data, expenses=expenses))
-        # Amount
-        ws.cell(column=9, row=row_no, value=data[10])
-        ws.cell(column=10, row=row_no, value='')
+        # # Partita Iva
+        # vat = f"IT{data[1]}"
+        # if data[1] == '':
+        #     vat = f"CF{data[2]}"
+        # ws.cell(column=2, row=row_no, value=vat)
+        # # Invoice no
+        # ws.cell(column=3, row=row_no, value='')
 
-        if expenses:
-            ws.cell(column=7, row=row_no, value="SP")
-            ws.cell(column=9, row=row_no, value="4,50")
+
+        # Invoice date
+        ws.cell(column=2, row=row_no, value='20/10/2021')
+        # Due date
+        ref = ws.cell(column=2, row=row_no).coordinate
+        ws.cell(column=3, row=row_no, value=self._get_due_date(terms, ref))
+        # Terms
+        ws.cell(column=4, row=row_no, value=f"{terms}")
+
+
+        # # Item product/service
+        # ws.cell(column=7, row=row_no, value=data[6])
+        # # Item description
+        # ws.cell(column=8, row=row_no, value=self._format_description(data, expenses=expenses))
+        # # Amount
+        # ws.cell(column=9, row=row_no, value=data[10])
+        # ws.cell(column=10, row=row_no, value='')
+
+        # if expenses:
+        #     ws.cell(column=7, row=row_no, value="SP")
+        #     ws.cell(column=9, row=row_no, value="4,50")
 
     def headings(self, ws):
         """
@@ -297,15 +313,15 @@ class PythonQuickBooks(object):
         """
         row = 1
         ws.cell(column=1, row=row, value='Customer')
-        ws.cell(column=2, row=row, value='Partita Iva')
-        ws.cell(column=3, row=row, value='Invoice no')
-        ws.cell(column=4, row=row, value='Invoice date')
-        ws.cell(column=5, row=row, value='Due date')
-        ws.cell(column=6, row=row, value='Terms')
-        ws.cell(column=7, row=row, value='Item product/service')
-        ws.cell(column=8, row=row, value='Item description')
-        ws.cell(column=9, row=row, value='Amount')
-        ws.cell(column=10, row=row, value='Item Tax Code')
+        # ws.cell(column=2, row=row, value='Partita Iva')
+        # ws.cell(column=3, row=row, value='Invoice no')
+        ws.cell(column=2, row=row, value='Invoice date')
+        ws.cell(column=3, row=row, value='Due date')
+        ws.cell(column=4, row=row, value='Terms')
+        # ws.cell(column=7, row=row, value='Item product/service')
+        # ws.cell(column=8, row=row, value='Item description')
+        # ws.cell(column=9, row=row, value='Amount')
+        # ws.cell(column=10, row=row, value='Item Tax Code')
 
     def list_credit_notes(self):
         creditnotes = CreditMemo.all(order_by="DocNumber DESC", qb=self.client)
@@ -317,16 +333,16 @@ class PythonQuickBooks(object):
         self._set_location_in_creditnotes()
 
     def run(self):
-        # self.import_invoices(input='data/invoices_origin.xlsx', output='data/output.xlsx')
-        self.set_location_in_accounting()
+        self.import_invoices(input='data/invoices_origin.xlsx', output='data/output.xlsx')
+        # self.set_location_in_accounting()
 
 
 def main():
 
     pyqb = PythonQuickBooks()
-    print(f"PYTHON QUICKBOOKS STARTED...")
+    print(f"PYTHON QUICKBOOKS STARTED...\n")
     pyqb.run()
-    print(f"PYTHON QUICKBOOKS ENDED.")
+    print(f"\nPYTHON QUICKBOOKS ENDED.")
 
 
 if __name__ == '__main__':
