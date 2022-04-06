@@ -1,3 +1,7 @@
+import sys
+import os
+import getopt
+
 from intuitlib.client import AuthClient
 from intuitlib.enums import Scopes
 from quickbooks import QuickBooks
@@ -12,6 +16,63 @@ from quickbooks.objects.creditmemo import CreditMemo
 from openpyxl import Workbook, load_workbook
 
 from settings import *
+
+
+actions = {
+    'invoices': ["-i", "-o"],
+    'locations': [],
+}
+
+all_arguments = []
+for name, arguments in actions.items():
+    all_arguments.extend(arguments)
+
+
+def main(argv):
+    global _arguments
+    _arguments = {}
+    try:
+        global _action
+        _action = argv[0].lower()
+        if _action not in actions.keys():
+            print("ERROR: unknown action %s" % _action)
+            usage()
+            sys.exit(2)
+        argv = argv[1:]
+        opts, args = getopt.getopt(argv, ':'.join(
+            all_arguments).replace('-', '') + ':')
+        if opts:
+            for opt, arg in opts:
+                if opt in actions[_action]:
+                    _arguments[opt] = arg
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+
+    # check if all arguements are set for the action
+    if set(actions[_action]) != set(_arguments.keys()):
+        print("ERROR: missing arguments for command %s" % _action)
+        usage()
+        sys.exit(2)
+
+
+def usage():
+    """Print command usage"""
+    print()
+    print("""******** RSTRT Python Quickbooks Script ********
+usage:
+
+Set invoice parameters from input file
+python main.py import -i input_file -o output_file
+
+Set location in invoices
+python main.py location
+
+""")
+
+
+
+
 
 class PythonQuickBooks(object):
     """
@@ -213,7 +274,7 @@ class PythonQuickBooks(object):
     #         if c.PrimaryTaxIdentifier.startswith("XXX"):
     #             print(f"[{c.DisplayName}] PARTITA IVA ERRATA {c.PrimaryTaxIdentifier}")
 
-    def import_invoices(self, input, output):
+    def import_invoices(self, input='data/invoices_origin.xlsx', output='data/output.xlsx'):
         """
         Import invoices into Quickbooks
 
@@ -234,7 +295,6 @@ class PythonQuickBooks(object):
         row_no = 2
 
         for row in ws.iter_rows(min_row=2, min_col=1, max_col=12, values_only=True):
-            # print(row[0])
             if row[0] is not None:
                 # 2.1
                 vat_id = f"IT{row[1]}"
@@ -266,6 +326,7 @@ class PythonQuickBooks(object):
         wb_out.save(output)
 
     def _output(self, ws, data, terms, row_no, expenses=False):
+        import datetime
         # # Customer
         ws.cell(column=1, row=row_no, value=data[0])
         # # Partita Iva
@@ -278,7 +339,8 @@ class PythonQuickBooks(object):
 
 
         # Invoice date
-        ws.cell(column=2, row=row_no, value='20/10/2021')
+        today = datetime.date.today().strftime('%d/%m/%Y')
+        ws.cell(column=2, row=row_no, value=today)
         # Due date
         ref = ws.cell(column=2, row=row_no).coordinate
         ws.cell(column=3, row=row_no, value=self._get_due_date(terms, ref))
@@ -332,18 +394,25 @@ class PythonQuickBooks(object):
         self._set_location_in_invoices()
         self._set_location_in_creditnotes()
 
-    def run(self):
-        self.import_invoices(input='data/invoices_origin.xlsx', output='data/output.xlsx')
-        # self.set_location_in_accounting()
-
-
-def main():
-
-    pyqb = PythonQuickBooks()
-    print(f"PYTHON QUICKBOOKS STARTED...\n")
-    pyqb.run()
-    print(f"\nPYTHON QUICKBOOKS ENDED.")
-
 
 if __name__ == '__main__':
-    main()
+
+    if len(sys.argv) < 2:
+        usage()
+        sys.exit(2)
+    main(sys.argv[1:])
+
+    pyqb = PythonQuickBooks()
+
+    if _action == 'invoices':
+        input_file = _arguments["-i"]
+        output_file = _arguments["-o"]
+
+        pyqb.import_invoices(input=input_file, output=output_file)
+
+    elif _action == 'locations':
+        pyqb.set_location_in_accounting()
+
+    else:
+        usage()
+        sys.exit(2)
