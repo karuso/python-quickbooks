@@ -1,6 +1,7 @@
 # CUSTOM SETTINGS
 data/
 *_local.py
+venv/
 
 
 # Byte-compiled / optimized / DLL files
