@@ -66,7 +66,7 @@ Set invoice parameters from input file
 python main.py import -i input_file -o output_file
 
 Set location in invoices
-python main.py location
+python main.py locations
 
 """)
 
@@ -94,6 +94,8 @@ class PythonQuickBooks(object):
         super(PythonQuickBooks, self).__init__()
         self.client = self._create_client()
         self.customers = self._load_customers()
+        self.invoices = self._load_invoices()
+        self.creditnotes = self._load_creditnotes()
         self.trovati = 0
 
     def _load_customers(self):
@@ -113,6 +115,36 @@ class PythonQuickBooks(object):
 
         return customers
 
+    def _load_invoices(self):
+        invoices = Invoice.where(
+            max_results=1000,
+            start_position=1,
+            order_by="TxnDate DESC",
+            qb=self.client)
+
+        invoices += Invoice.where(
+            max_results=1000,
+            start_position=1000,
+            order_by="TxnDate DESC",
+            qb=self.client)
+
+        return invoices
+
+    def _load_creditnotes(self):
+        creditnotes = CreditMemo.where(
+            max_results=1000,
+            start_position=1,
+            order_by="TxnDate DESC",
+            qb=self.client)
+
+        creditnotes += CreditMemo.where(
+            max_results=1000,
+            start_position=1000,
+            order_by="TxnDate DESC",
+            qb=self.client)
+
+        return creditnotes
+
     def _create_client(self):
         auth_client = AuthClient(
             client_id=CLIENT_ID,
@@ -121,8 +153,24 @@ class PythonQuickBooks(object):
             redirect_uri='https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl',
         )
 
-        # Refresh token endpoint
-        auth_client.refresh(refresh_token=REFRESH_TOKEN)
+        # url = auth_client.get_authorization_url([Scopes.ACCOUNTING])
+        # res = auth_client.get(url=url)
+        # print(help(res))
+        # sys.exit()
+        # print(f"access_token: {auth_client.access_token}")
+        # print(f"refresh_token: {auth_client.refresh_token}")
+        # print(f"realm_id: {auth_client.realm_id}")
+
+
+
+        # print(help(auth_client))
+
+        # auth_code = request.GET.get('code', None)
+        # realm_id = request.GET.get('realmId', None)
+        # request.session['realm_id'] = realm_id
+
+        # # Refresh token endpoint
+        # auth_client.refresh(refresh_token=REFRESH_TOKEN)
 
         client = QuickBooks(
             auth_client=auth_client,
@@ -131,6 +179,7 @@ class PythonQuickBooks(object):
             minorversion=54
         )
 
+        # return None
         return client
 
     def _get_location(self, sales_name):
@@ -148,11 +197,7 @@ class PythonQuickBooks(object):
         TODO: make it scriptable to run into a cron job
         """
         print(f"set_location_in_invoices started...")
-        invoices = Invoice.filter(max_results=1000,
-                                  order_by="DocNumber DESC",
-                                  qb=self.client)
-
-        for i in invoices:
+        for i in self.invoices:
             if i.DepartmentRef is None:
                 c = Customer.get(i.CustomerRef.value, qb=self.client)
                 if c.Suffix != "":
@@ -179,11 +224,7 @@ class PythonQuickBooks(object):
         TODO: make it scriptable to run into a cron job
         """
         print(f"set_location_in_creditnotes started...")
-        creditnotes = CreditMemo.filter(max_results=1000,
-                                        order_by="DocNumber DESC",
-                                        qb=self.client)
-
-        for cn in creditnotes:
+        for cn in self.creditnotes:
             if cn.DepartmentRef is None:
                 c = Customer.get(cn.CustomerRef.value, qb=self.client)
                 if c.Suffix != "":
