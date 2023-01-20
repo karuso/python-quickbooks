@@ -63,7 +63,7 @@ def usage():
 usage:
 
 Set invoice parameters from input file
-python main.py import -i input_file -o output_file
+python main.py invoices -i input_file -o output_file
 
 Set location in invoices
 python main.py locations
@@ -319,13 +319,13 @@ class PythonQuickBooks(object):
         """
         Import invoices into Quickbooks
 
-        1. Open input file (INVOICES.xlsx) and set active sheet
-        2. Create output file (TO_BE_IMPORTED.xlsx)
+        1. Open input file (invoices_origin.xlsx) and set active sheet
+        2. Create output file (invoices_output.xlsx)
         2. For each row
             2.1 Select customer from VAT number (or CF if empty)
             2.2 Get customer Terms of Payment (ToP)
             2.3 Evaluate formula for due date based on ToP
-            2.3 Write row into TO_BE_IMPORTED.xlsx
+            2.3 Write row into invoices_output.xlsx
         """
         # 1
         ws = self._load_excel_file(input)
